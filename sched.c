@@ -218,6 +218,7 @@ int load_workload(const char* path, job_t** jobs, int* n){
         {
             if (jobs_array[i].pid == jobs_array[j].pid)
             {
+                fprintf("Processes in workload must have unique PID's!")
                 workload_status = 1;
                 break;
             }
