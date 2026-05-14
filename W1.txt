@@ -1,0 +1,8 @@
+# CMPT360 A2 — Workload W1 (staggered arrivals)
+# Format: PID ARRIVAL CPU_TIME
+2 0 7
+4 2 4
+3 4 1
+1 0 7
+0 2 4
+
