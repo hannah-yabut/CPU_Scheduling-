@@ -13,35 +13,57 @@
 #include <string.h>
 #include <sys/types.h>
 #include "sched.h"
+#include "queue.h"
 
 void insertion_sort_pid(job_t* array, int n) {
-    for (int i = 1; i < n; i++)
+    for (int i = 1; i < n; ++i)
     {
         int key = array[i].pid;
+        int temp_arrival = array[i].arrival;
+        int temp_cpu_time = array[i].cpu_time;
         int j = i - 1;
        
         while (j >= 0 && array[j].pid > key)
         {
             array[j + 1].pid = array[j].pid;
+            array[j + 1].arrival = array[j].arrival;
+            array[j + 1].cpu_time = array[j].cpu_time;
             j--;
         }
         array[j + 1].pid = key;
+        array[j + 1].arrival = temp_arrival;
+        array[j + 1].cpu_time = temp_cpu_time;
     }
 }
 
-void insertion_sort_arrival(job_t* array, int n) {
-    for (int i = 1; i < n; i++)
+int sum_cpu_time(const job_t* jobs, int n)
+{
+    int total = 0;
+    for (int i = 0; i < n; i++)
     {
-        int key = array[i].arrival;
-        int j = i - 1;
-
-        while (j >= 0 && array[j].arrival > key)
-        {
-            array[j + 1].arrival = array[j].arrival;
-            j--;
-        }
-        array[j + 1].arrival = key;
+        total += jobs[i].cpu_time;
     }
+    return total;
+}
+
+void print_time_array(int n)
+{
+    printf("%-*s", 6, "time:");
+    for (int i = 0; i < n; i++)
+    {
+        printf(" %6d", i);
+    }
+    printf("\n");
+}
+
+void print_run_array(int* array, int n)
+{
+    printf("%-*s", 6, "run:");
+    for (int i = 0; i < n; i++)
+    {
+        printf(" %6d", array[i]);
+    }
+    printf("\n");
 }
 
 static void usage(const char* prog){
@@ -152,11 +174,11 @@ int load_workload(const char* path, job_t** jobs, int* n){
     int pid, arrival, cpu_time;
     int line_num = 0;
 
-    int workload_status; //0 = success, 1 = unsuccesful
+    int workload_status = 0; //0 = success, 1 = unsuccesful
 
     int capacity = 10;
-    job_t* jobs_array = malloc(sizeof(job_t) * capacity);
-    if (jobs_array == NULL)
+    *jobs = (job_t*)malloc(capacity * sizeof(job_t));
+    if (*jobs == NULL)
     {
         fprintf(stderr, "Memory allocation failed in workload!");
         fclose(file);
@@ -179,21 +201,21 @@ int load_workload(const char* path, job_t** jobs, int* n){
             {
                 if (line_num >= capacity) {
                     capacity *= 2;
-                    job_t* new_jobs_array = realloc(jobs_array, sizeof(job_t) * capacity);
+                    job_t* new_jobs_array = realloc(*jobs, capacity * sizeof(job_t*));
 
                     if (new_jobs_array == NULL)
                     {
                         fprintf(stderr, "Memory reallocation failed in workload!");
-                        free(jobs_array);
+                        free(*jobs);
                         free(line);
                         workload_status = 1;
                         break;
                     }
-                    jobs_array = new_jobs_array;
+                    *jobs = new_jobs_array;
                 }
-                jobs_array[line_num].pid = pid;
-                jobs_array[line_num].arrival = arrival;
-                jobs_array[line_num].cpu_time = cpu_time;
+                (*jobs)[line_num].pid = pid;
+                (*jobs)[line_num].arrival = arrival;
+                (*jobs)[line_num].cpu_time = cpu_time;
                 line_num++;
             }
             else
@@ -211,28 +233,29 @@ int load_workload(const char* path, job_t** jobs, int* n){
         }
     }
 
-    //TODO: Make sure multiple processes do not have same PID
+    int j = 1;
     for (int i = 0; i < line_num; i++)
     {
-        for (int j = 1; j < line_num; j++)
+        for (; j < line_num; j++)
         {
-            if (jobs_array[i].pid == jobs_array[j].pid)
+            if ((*jobs)[i].pid == (*jobs)[j].pid)
             {
-                fprintf("Processes in workload must have unique PID's!")
+                printf("Processes in workload must have unique PID's!");
                 workload_status = 1;
                 break;
             }
         }
+        j++;
     }
 
-    insertion_sort_pid(jobs_array, line_num);
+    insertion_sort_pid((*jobs), line_num);
+
+    for (int i = 0; i < line_num; i++)
+    {
+        printf("Sorted by PID --> PID: %d\t Arrival time: %d\t CPU time: %d\n", (*jobs)[i].pid, (*jobs)[i].arrival, (*jobs)[i].cpu_time);
+    }
 
     *n = line_num;
-
-    workload_status = 0;
-
-    free(jobs_array);
-    jobs_array = NULL;
 
     fclose(file);
     file = NULL;
@@ -254,8 +277,67 @@ int load_workload(const char* path, job_t** jobs, int* n){
 */
 int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out){
     (void)jobs; (void)n; (void)cfg; (void)out;
-    fprintf(stderr, "TODO: simulate() not implemented\n");
-    return 1;
+
+    int total_runtime = sum_cpu_time(jobs, n);
+    printf("Total runtime: %d\n", total_runtime);
+
+    int* cpu_runtime_array = (int*)malloc(total_runtime * sizeof(int));
+    if (cpu_runtime_array == NULL)
+    {
+        fprintf(stderr, "Memory allocation failed in simulate!");
+        return 1;
+    }
+
+    //TODO: Check if there are no jobs
+
+    //FCFS Implementation
+    if (cfg->policy == POL_FCFS)
+    {
+        Queue queue;
+        job_details_t* jobs_info = (job_details_t*)malloc(n * sizeof(job_details_t));
+        if (jobs_info == NULL)
+        {
+            fprintf(stderr, "Memory allocation failed in simulate!");
+            return 1;
+        }
+
+        initialize_queue(&queue);
+        int curr_pid = 0;
+        int curr_process_runtime = 0;
+        for (int cpu_tick = 0; cpu_tick < total_runtime; cpu_tick++)
+        {
+            if (!is_empty(&queue))
+            {
+                curr_process_runtime += 1;
+            }
+
+            if (curr_process_runtime == jobs[curr_pid].cpu_time)
+            {
+                dequeue(&queue);
+                curr_process_runtime = 0;
+                curr_pid += 1;
+            }
+
+            if (jobs[cpu_tick].arrival == cpu_tick)
+            {
+                enqueue(&queue, jobs[cpu_tick].pid);
+            }
+
+            cpu_runtime_array[cpu_tick] = curr_pid;
+        }
+    }
+    else
+    {
+        //RR Implementation
+    }
+
+    print_time_array(total_runtime);
+    print_run_array(cpu_runtime_array, total_runtime);
+    
+    free(cpu_runtime_array);
+    cpu_runtime_array = NULL;
+
+    return 0;
 }
 
 int main(int argc, char** argv){
@@ -268,10 +350,8 @@ int main(int argc, char** argv){
 
     printf("Number of processes: %d, File path: %s\n", n, in_path);
 
-    /*
     sim_metrics_t m;
     if (simulate(jobs, n, &cfg, &m) != 0) { free(jobs); return 3; }
-    */
 
     free(jobs);
     jobs = NULL;

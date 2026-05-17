@@ -26,13 +26,13 @@ sched: sched.o
 	$(CC) $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
 #Compile source file into object file
-sched.o: sched.c sched.h
-	$(CC) $(CFLAGS) -c -h$<
+sched.o: sched.c sched.h queue.h
+	$(CC) $(CFLAGS) -c $<
 
 
 #Run executable manually
 run_FCFS: sched
-	./sched --policy=FCFS --in=workload.txt
+	./sched --policy=FCFS --in=W1.txt
 
 run_RR: sched
 	./sched --policy=RR --quantum=2 --in=workload.txt
