@@ -7,10 +7,11 @@
  */
 #ifndef SCHED_H
 #define SCHED_H
+#include <stdbool.h>
+
+typedef struct { int pid, first_run, completion, tat, resp; bool set_first_run; } job_details_t;
 
 typedef struct { int pid, arrival, cpu_time; } job_t;
-
-typedef struct { int first_run, completion, tat, resp; } job_details_t;
 
 typedef enum { POL_FCFS, POL_RR } policy_t;
 

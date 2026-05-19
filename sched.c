@@ -14,6 +14,7 @@
 #include <sys/types.h>
 #include "sched.h"
 #include "queue.h"
+#include "stdbool.h"
 
 void insertion_sort_pid(job_t* array, int n) {
     for (int i = 1; i < n; ++i)
@@ -36,14 +37,25 @@ void insertion_sort_pid(job_t* array, int n) {
     }
 }
 
-int sum_cpu_time(const job_t* jobs, int n)
-{
-    int total = 0;
-    for (int i = 0; i < n; i++)
+void insertion_sort_arrival(job_t* array, int n) {
+    for (int i = 1; i < n; ++i)
     {
-        total += jobs[i].cpu_time;
+        int key = array[i].arrival;
+        int temp_pid = array[i].pid;
+        int temp_cpu_time = array[i].cpu_time;
+        int j = i - 1;
+
+        while (j >= 0 && array[j].arrival > key)
+        {
+            array[j + 1].pid = array[j].pid;
+            array[j + 1].arrival = array[j].arrival;
+            array[j + 1].cpu_time = array[j].cpu_time;
+            j--;
+        }
+        array[j + 1].arrival = key;
+        array[j + 1].pid = temp_pid;
+        array[j + 1].cpu_time = temp_cpu_time;
     }
-    return total;
 }
 
 void print_time_array(int n)
@@ -61,9 +73,53 @@ void print_run_array(int* array, int n)
     printf("%-*s", 6, "run:");
     for (int i = 0; i < n; i++)
     {
-        printf(" %6d", array[i]);
+        if (array[i] != -1)
+        {
+            printf(" %6d", array[i]);
+        }
+        else
+        {
+            printf(" %6c", '-');
+        }
     }
     printf("\n");
+}
+
+void print_job_details(job_details_t* job_details, int n)
+{
+    for (int i = 0; i < n; i++)
+    {
+        printf("P%d: first run=%d completion=%d TAT=%d RESP=%d \n", job_details[i].pid, 
+            job_details[i].first_run, 
+            job_details[i].completion, 
+            job_details[i].tat, 
+            job_details[i].resp);
+    }
+}
+
+void print_job_systems(sim_metrics_t out)
+{
+    printf("System: ctx_switches=%d, avgTAT=%.3f, avgRESP=%.3f \n", out.context_switches, out.avg_tat, out.avg_resp);
+}
+
+int sum_tat(job_details_t* job_details, int n)
+{
+    int total = 0;
+    for (int i = 0; i < n; i++)
+    {
+        total += job_details[i].tat;
+    }
+    return total;
+}
+
+int sum_resp(job_details_t* job_details, int n)
+{
+    int total = 0;
+    for (int i = 0; i < n; i++)
+    {
+        total += job_details[i].resp;
+    }
+    return total;
 }
 
 static void usage(const char* prog){
@@ -182,6 +238,7 @@ int load_workload(const char* path, job_t** jobs, int* n){
     {
         fprintf(stderr, "Memory allocation failed in workload!");
         fclose(file);
+        file = NULL;
         return 1;
     }
 
@@ -233,6 +290,15 @@ int load_workload(const char* path, job_t** jobs, int* n){
         }
     }
 
+    if (line_num == 0)
+    {
+        fprintf(stderr, "No jobs present in file!");
+
+        fclose(file);
+        file = NULL;
+        return 1;
+    }
+
     int j = 1;
     for (int i = 0; i < line_num; i++)
     {
@@ -249,6 +315,8 @@ int load_workload(const char* path, job_t** jobs, int* n){
     }
 
     insertion_sort_pid((*jobs), line_num);
+
+    insertion_sort_arrival((*jobs), line_num);
 
     for (int i = 0; i < line_num; i++)
     {
@@ -278,64 +346,108 @@ int load_workload(const char* path, job_t** jobs, int* n){
 int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out){
     (void)jobs; (void)n; (void)cfg; (void)out;
 
-    int total_runtime = sum_cpu_time(jobs, n);
-    printf("Total runtime: %d\n", total_runtime);
-
-    int* cpu_runtime_array = (int*)malloc(total_runtime * sizeof(int));
+    int capacity = 10;
+    int* cpu_runtime_array = (int*)malloc(capacity * sizeof(int));
     if (cpu_runtime_array == NULL)
     {
         fprintf(stderr, "Memory allocation failed in simulate!");
         return 1;
     }
 
-    //TODO: Check if there are no jobs
+    job_details_t* job_details = (job_details_t*)malloc(n * sizeof(job_details_t));
+
+    if (job_details == NULL)
+    {
+        fprintf(stderr, "Memory allocation failed in simulate!");
+        return 1;
+    }
 
     //FCFS Implementation
     if (cfg->policy == POL_FCFS)
     {
         Queue queue;
-        job_details_t* jobs_info = (job_details_t*)malloc(n * sizeof(job_details_t));
-        if (jobs_info == NULL)
-        {
-            fprintf(stderr, "Memory allocation failed in simulate!");
-            return 1;
-        }
 
         initialize_queue(&queue);
-        int curr_pid = 0;
+        int index = 0;
         int curr_process_runtime = 0;
-        for (int cpu_tick = 0; cpu_tick < total_runtime; cpu_tick++)
+        int cpu_tick = 0;
+        int num_jobs_finished = 0;
+        (*out).context_switches = 0;
+
+        while (num_jobs_finished < n)
         {
-            if (!is_empty(&queue))
+            if (cpu_tick >= capacity)
             {
-                curr_process_runtime += 1;
+                capacity *= 2;
+                int* new_cpu_runtime_array = realloc(cpu_runtime_array, capacity * sizeof(int));
+
+                if (new_cpu_runtime_array == NULL)
+                {
+                    fprintf(stderr, "Memory reallocation failed in simulate!");
+                    free(cpu_runtime_array);
+                    cpu_runtime_array = NULL;
+                    return 1;
+                }
+                cpu_runtime_array = new_cpu_runtime_array;
             }
 
-            if (curr_process_runtime == jobs[curr_pid].cpu_time)
+            if (curr_process_runtime == jobs[index].cpu_time)
             {
+                job_details[index].completion = cpu_tick;
+                job_details[index].tat = job_details[index].completion - jobs[index].arrival;
                 dequeue(&queue);
                 curr_process_runtime = 0;
-                curr_pid += 1;
+                index++;
+                num_jobs_finished++;
+                (*out).context_switches++;
             }
 
-            if (jobs[cpu_tick].arrival == cpu_tick)
+            for (int i = 0; i < n; i++)
             {
-                enqueue(&queue, jobs[cpu_tick].pid);
+                if (!is_in_queue(&queue, jobs[i].pid) && jobs[i].arrival == cpu_tick)
+                {
+                    enqueue(&queue, jobs[i].pid);
+                }
             }
 
-            cpu_runtime_array[cpu_tick] = curr_pid;
+            if (!is_empty(&queue))
+            {
+                if (!job_details[index].set_first_run)
+                {
+                    job_details[index].pid = jobs[index].pid;
+                    job_details[index].first_run = cpu_tick;
+                    job_details[index].set_first_run = true;
+
+                    job_details[index].resp = job_details[index].first_run - jobs[index].arrival;
+                }
+                curr_process_runtime += 1;
+                cpu_runtime_array[cpu_tick] = jobs[index].pid;
+            }
+            else
+            {
+                cpu_runtime_array[cpu_tick] = -1;
+            }
+            cpu_tick++;
         }
+
+        (*out).avg_tat = (double)sum_tat(job_details, n) / n;
+        (*out).avg_resp = (double)sum_resp(job_details, n) / n;
+        (*out).context_switches--;
+
+        print_time_array(cpu_tick - 1);
+        print_run_array(cpu_runtime_array, cpu_tick - 1);
+        print_job_details(job_details, n);
+
+        free(cpu_runtime_array);
+        cpu_runtime_array = NULL;
     }
     else
     {
         //RR Implementation
     }
 
-    print_time_array(total_runtime);
-    print_run_array(cpu_runtime_array, total_runtime);
-    
-    free(cpu_runtime_array);
-    cpu_runtime_array = NULL;
+    free(job_details);
+    job_details = NULL;
 
     return 0;
 }
@@ -348,10 +460,10 @@ int main(int argc, char** argv){
     job_t* jobs=NULL; int n=0;
     if (load_workload(in_path, &jobs, &n) != 0) return 2;
 
-    printf("Number of processes: %d, File path: %s\n", n, in_path);
-
     sim_metrics_t m;
     if (simulate(jobs, n, &cfg, &m) != 0) { free(jobs); return 3; }
+
+    print_job_systems(m);
 
     free(jobs);
     jobs = NULL;

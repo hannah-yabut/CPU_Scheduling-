@@ -78,6 +78,26 @@ int get_front(Queue* q) {
     return q->front->pid;
 }
 
+bool is_in_queue(Queue* q, int pid) {
+
+    if (is_empty(q))
+    {
+        return false;
+    }
+
+    Node* temp = q->front;
+    while (temp != NULL) 
+    {
+        if (temp->pid == pid)
+        {
+            return true;
+        }
+        temp = temp->next;
+    }
+    
+    return false;
+}
+
 void free_queue(Queue* q) {
     while (!is_empty(q)) {
         dequeue(q);
