@@ -258,7 +258,8 @@ int load_workload(const char* path, job_t** jobs, int* n){
             {
                 if (line_num >= capacity) {
                     capacity *= 2;
-                    job_t* new_jobs_array = realloc(*jobs, capacity * sizeof(job_t*));
+                    // used sice of pointer instead of struct 
+                    job_t* new_jobs_array = realloc(*jobs, capacity * sizeof(job_t)); 
 
                     if (new_jobs_array == NULL)
                     {
@@ -325,6 +326,9 @@ int load_workload(const char* path, job_t** jobs, int* n){
 
     *n = line_num;
 
+    free(line); // frees memory 
+    line = NULL; 
+
     fclose(file);
     file = NULL;
 
@@ -361,7 +365,15 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
         fprintf(stderr, "Memory allocation failed in simulate!");
         return 1;
     }
-
+    
+    for (int i = 0; i < n; i++) {
+        job_details[i].pid = jobs[i].pid;
+        job_details[i].first_run = -1;
+        job_details[i].completion = 0;
+        job_details[i].tat = 0;
+        job_details[i].resp = 0;
+        job_details[i].set_first_run = false;
+    }
     //FCFS Implementation
     if (cfg->policy == POL_FCFS)
     {
@@ -412,7 +424,8 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
 
             if (!is_empty(&queue))
             {
-                if (!job_details[index].set_first_run)
+                // checks if prpcess has never been scheduled and reports 1st cpu time 
+                if (job_details[index].first_run == -1)
                 {
                     job_details[index].pid = jobs[index].pid;
                     job_details[index].first_run = cpu_tick;
