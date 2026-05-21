@@ -27,7 +27,7 @@ Example Runs:
 - Followed the skeleton outline of the file sched.c for the main functions used in the program 
 
 # Status
-The program works as intended throughout all the differnet test cases 
+The program works as intended throughout all the different test cases 
 
 # Assumptions / Notes 
 - Assumed that memory allocation of newly arriving jobs would be dynamid rather than static. This is reflected in the design choice using realloc()
