@@ -16,7 +16,7 @@ VALGRIND ?= valgrind
 VGFLAGS  ?= --leak-check=full --show-leak-kinds=all --track-origins=yes --errors-for-leak-kinds=all --error-exitcode=1
 
 #Declare the following targets as makefile commands instead of file targets
-.PHONY: all clean valgrind vg
+.PHONY: all clean valgrind vg run_FCFS run_RR
 
 #Build userclean executable
 all: sched
@@ -37,9 +37,9 @@ run_FCFS: sched
 run_RR: sched
 	./sched --policy=RR --quantum=2 --in=workload.txt
 
-#Run memory leak and error detection with Valgrind by using input.txt file as input
+#Run memory leak and error detection with Valgrind by using workload.txt file as input
 valgrind: sched
-	$(VALGRIND) $(VGFLAGS) ./sched < input.txt
+	$(VALGRIND) $(VGFLAGS) ./sched --policy=RR --quantum=2 --in=workload.txt
 
 #Alias for Valgrind
 vg: valgrind

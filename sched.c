@@ -1,9 +1,9 @@
 /*
  * Student Name: Hannah Yabut and Ismael Robleh 
  * Student ID:  3131432 & 3149556
- * Date:         ____________________________________________
- * File:         ____________________________________________
- * Description:  ____________________________________________
+ * Date:         May 24, 2026 
+ * File:         sched.c 
+ * Description:  Main file where the functions to simulate a CPU are. This is done through two differeny ways, FCFS and RR. 
  */
 
 
@@ -59,27 +59,27 @@ void insertion_sort_arrival(job_t* array, int n) {
 }
 
 void print_time_array(int n)
-{
-    printf("%-*s", 6, "time:");
+{    
+    printf("%-*s", 4, "time:");
     for (int i = 0; i < n; i++)
     {
-        printf(" %6d", i);
+        printf(" %2d", i);
     }
     printf("\n");
 }
 
 void print_run_array(int* array, int n)
-{
-    printf("%-*s", 6, "run:");
+{   
+    printf("%-*s", 4, "run :");
     for (int i = 0; i < n; i++)
     {
         if (array[i] != -1)
         {
-            printf(" %6d", array[i]);
+            printf(" %2d", array[i]);
         }
         else
         {
-            printf(" %6c", '-');
+            printf(" %3c", '-');
         }
     }
     printf("\n");
@@ -88,7 +88,7 @@ void print_run_array(int* array, int n)
 void print_job_details(job_details_t* job_details, int n)
 {
     for (int i = 0; i < n; i++)
-    {
+    {  
         printf("P%d: first run=%d completion=%d TAT=%d RESP=%d \n", job_details[i].pid, 
             job_details[i].first_run, 
             job_details[i].completion, 
@@ -98,7 +98,7 @@ void print_job_details(job_details_t* job_details, int n)
 }
 
 void print_job_systems(sim_metrics_t out)
-{
+{   
     printf("System: ctx_switches=%d, avgTAT=%.3f, avgRESP=%.3f \n", out.context_switches, out.avg_tat, out.avg_resp);
 }
 
@@ -139,16 +139,16 @@ int parse_args(int argc, char** argv, sim_cfg_t* cfg, const char** in_path)
     int seen_policy = 0; 
     int seen_in = 0; 
     int seen_quantum = 0; 
-
+    // setting default vals before arguments 
     cfg->quantum = 0; 
     cfg->policy = 0; 
     *in_path = NULL; 
-
+    // loop through command line args while skipping program name 
     for (int i = 1; i < argc; i++)
-    {
+    {   
         if (strncmp(argv[i], "--policy=", 9) == 0)
         {
-            const char* val = argv[i] + 9; 
+            const char* val = argv[i] + 9; // getting value after "--policy="
             if (strcmp(val, "FCFS") == 0)
             {
                 cfg->policy = POL_FCFS; 
@@ -166,8 +166,10 @@ int parse_args(int argc, char** argv, sim_cfg_t* cfg, const char** in_path)
         }
         else if (strncmp(argv[i], "--quantum=", 10) == 0)
         {
+            // convert quantum value from str to a value 
             char* end = NULL;
             long q = strtol(argv[i] + 10, &end, 10);
+            // reject empty, invalid, or negative quantum values 
             if (*end != '\0' || q <= 0) 
             {
                 usage(argv[0]); 
@@ -178,6 +180,7 @@ int parse_args(int argc, char** argv, sim_cfg_t* cfg, const char** in_path)
         }
         else if (strncmp(argv[i], "--in=", 5) == 0)
         {
+            // store input file 
             *in_path = argv[i] + 5; 
             if (**in_path == '\0') // if the file input line is empty
             {
@@ -188,21 +191,21 @@ int parse_args(int argc, char** argv, sim_cfg_t* cfg, const char** in_path)
         }
         else
         {
-            usage(argv[0]);
+            usage(argv[0]); // if unknown args, return usage message 
             return 1; 
         }
     }
-    if (!seen_policy || !seen_in)
+    if (!seen_policy || !seen_in) // policy and input file needed 
     {
          usage(argv[0]);
             return 1; 
     }
-    if (cfg->policy == POL_RR && !seen_quantum) 
+    if (cfg->policy == POL_RR && !seen_quantum) // RR needs quantum value 
     {
         usage(argv[0]);
         return 1;
     }
-    if (cfg->policy == POL_FCFS && seen_quantum) 
+    if (cfg->policy == POL_FCFS && seen_quantum) // FCFS should not have quantum value 
     {
         usage(argv[0]);
         return 1;
@@ -258,7 +261,7 @@ int load_workload(const char* path, job_t** jobs, int* n){
             {
                 if (line_num >= capacity) {
                     capacity *= 2;
-                    // used sice of pointer instead of struct 
+                    // used size of pointer instead of struct 
                     job_t* new_jobs_array = realloc(*jobs, capacity * sizeof(job_t)); 
 
                     if (new_jobs_array == NULL)
@@ -318,7 +321,7 @@ int load_workload(const char* path, job_t** jobs, int* n){
     insertion_sort_pid((*jobs), line_num);
 
     insertion_sort_arrival((*jobs), line_num);
-
+    // think we need to remove this print line (not in the expected output txt) 
     for (int i = 0; i < line_num; i++)
     {
         printf("Sorted by PID --> PID: %d\t Arrival time: %d\t CPU time: %d\n", (*jobs)[i].pid, (*jobs)[i].arrival, (*jobs)[i].cpu_time);
@@ -453,16 +456,159 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
 
         free(cpu_runtime_array);
         cpu_runtime_array = NULL;
+
+        free(job_details);
+        job_details = NULL; 
+        return 0; 
     }
     else
     {
         //RR Implementation
+        Queue queue;
+        initialize_queue(&queue);
+
+        // allocate space 
+        int *jobs_left = malloc(n * sizeof(int));
+        int *added_jobs = calloc(n, sizeof(int));
+
+        if (jobs_left == NULL || added_jobs == NULL) 
+        {
+            fprintf(stderr, "Memory allocation failed in RR.\n");
+            free(jobs_left);
+            free(added_jobs);
+            free(cpu_runtime_array); 
+            free(job_details);
+            return 1; // safely exit 
+        }
+
+        for (int i = 0; i < n; i++) 
+        {
+            jobs_left[i] = jobs[i].cpu_time; 
+        }
+
+        int cpu_tick = 0; 
+        int num_jobs_finished = 0; 
+        int current_index = -1; 
+        int quantum_used = 0; 
+
+        while (num_jobs_finished < n)
+        {
+            if (cpu_tick >= capacity)
+            {
+                capacity *= 2; // double capacity 
+                int* new_cpu_runtime_array = realloc(cpu_runtime_array, capacity * sizeof(int));
+
+                if (new_cpu_runtime_array == NULL)
+                {
+                    fprintf(stderr, "Memory reallocation failed in RR!\n");
+                    free(jobs_left);
+                    free(added_jobs);
+                    free(cpu_runtime_array);
+                    return 1;
+                }
+                cpu_runtime_array= new_cpu_runtime_array; 
+            }
+            // add jobs that just arrived to ready queue 
+            for (int i = 0; i < n; i++)
+            {
+                if (!added_jobs[i] && jobs[i].arrival == cpu_tick)
+                {
+                    enqueue(&queue, jobs[i].pid);
+                    added_jobs[i] = 1; 
+                }
+            }
+        
+
+            // if no process running, choose next ready process
+            if (current_index == -1 && !is_empty(&queue))
+            {
+                int next_pid = dequeue(&queue);
+                for (int i = 0; i < n; i++)
+                {
+                    if (jobs[i].pid == next_pid)
+                    {
+                        current_index = i; 
+                        break; 
+                    }
+                }
+                quantum_used = 0; 
+                if (job_details[current_index].first_run == -1)
+                {
+                    job_details[current_index].first_run = cpu_tick;
+                    job_details[current_index].resp =
+                    job_details[current_index].first_run - jobs[current_index].arrival;
+                }
+            }
+
+            if (current_index != -1)
+            {
+                cpu_runtime_array[cpu_tick] = jobs[current_index].pid;
+
+                jobs_left[current_index]--;
+                quantum_used++;
+
+                // process done at the end of this tick
+                if (jobs_left[current_index] == 0)
+                {
+                    job_details[current_index].completion = cpu_tick + 1;
+                    job_details[current_index].tat = job_details[current_index].completion - jobs[current_index].arrival;
+
+                    current_index = -1;
+                    quantum_used = 0;
+                    num_jobs_finished++;
+                }
+                // quantum expired, put the process at back of queue
+                else if (quantum_used == cfg->quantum)
+                {
+                    enqueue(&queue, jobs[current_index].pid);
+                    current_index = -1;
+                    quantum_used = 0;
+                }
+            }
+            else
+            {
+                cpu_runtime_array[cpu_tick] = -1;
+            }
+
+            cpu_tick++;
+        }
+
+    out->context_switches = 0;
+    int prev = -1;
+
+    for (int i = 0; i < cpu_tick; i++)
+    {
+        int cur = cpu_runtime_array[i];
+
+        if (cur >= 0 && prev >= 0 && cur != prev)
+        {
+            out->context_switches++;
+        }
+
+        if (cur >= 0)
+         {
+            prev = cur;
+        }
     }
+        out->avg_tat = (double)sum_tat(job_details, n) / n;
+        out->avg_resp = (double)sum_resp(job_details, n) / n;
+        // call printing functions 
+        print_time_array(cpu_tick);
+        print_run_array(cpu_runtime_array, cpu_tick);
+        print_job_details(job_details, n);
 
-    free(job_details);
-    job_details = NULL;
+        // free memory 
+        free(jobs_left);
+        free(added_jobs);
+        free(cpu_runtime_array);
+        cpu_runtime_array = NULL;
+        
 
-    return 0;
+        free(job_details);
+        job_details = NULL;
+
+        return 0;
+    }
 }
 
 int main(int argc, char** argv){
