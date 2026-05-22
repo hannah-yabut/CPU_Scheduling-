@@ -24,13 +24,16 @@ void insertion_sort_pid(job_t* array, int n) {
         int temp_cpu_time = array[i].cpu_time;
         int j = i - 1;
        
+        //Keep replacing the left most elements of the key until j is out of bounds or the elements are already smaller or equal to the key
         while (j >= 0 && array[j].pid > key)
         {
+            //Replace values
             array[j + 1].pid = array[j].pid;
             array[j + 1].arrival = array[j].arrival;
             array[j + 1].cpu_time = array[j].cpu_time;
             j--;
         }
+        //Set the temporary values back to the replaced values to avoid corruption
         array[j + 1].pid = key;
         array[j + 1].arrival = temp_arrival;
         array[j + 1].cpu_time = temp_cpu_time;
@@ -45,13 +48,16 @@ void insertion_sort_arrival(job_t* array, int n) {
         int temp_cpu_time = array[i].cpu_time;
         int j = i - 1;
 
+        //Keep replacing the left most elements of the key until j is out of bounds or the elements are already smaller or equal to the key
         while (j >= 0 && array[j].arrival > key)
         {
+            //Replace values
             array[j + 1].pid = array[j].pid;
             array[j + 1].arrival = array[j].arrival;
             array[j + 1].cpu_time = array[j].cpu_time;
             j--;
         }
+        //Set the temporary values back to the replaced values to avoid corruption
         array[j + 1].arrival = key;
         array[j + 1].pid = temp_pid;
         array[j + 1].cpu_time = temp_cpu_time;
@@ -59,7 +65,8 @@ void insertion_sort_arrival(job_t* array, int n) {
 }
 
 void print_time_array(int n)
-{    
+{   
+    //Reserve 4 spaces with a left-alignment
     printf("%-*s", 4, "time:");
     for (int i = 0; i < n; i++)
     {
@@ -70,15 +77,18 @@ void print_time_array(int n)
 
 void print_run_array(int* array, int n)
 {   
+    //Reserve 4 spaces with a left-alignment
     printf("%-*s", 4, "run :");
     for (int i = 0; i < n; i++)
     {
+        //Non idling cpu ticks
         if (array[i] != -1)
         {
             printf(" %2d", array[i]);
         }
         else
         {
+            //Idle cpu ticks
             printf(" %3c", '-');
         }
     }
@@ -220,6 +230,7 @@ int parse_args(int argc, char** argv, sim_cfg_t* cfg, const char** in_path)
 int load_workload(const char* path, job_t** jobs, int* n){
     (void)path; (void)jobs; (void)n;
 
+    //Open file
     FILE* file = fopen(path, "r");
     if (file == NULL) {
         perror("Error opening file");
@@ -245,20 +256,29 @@ int load_workload(const char* path, job_t** jobs, int* n){
         return 1;
     }
 
+    //Read through the file line by line 
     while ((num_read = getline(&line, &length, file)) != EOF) {
+
+        //Skip '#' and newline characters if they are present
         if (line[0] == '#' || line[0] == '\n') continue;
 
+        //Replace newlines characters with the null operator 
         if (line[num_read - 1] == '\n')
         {
             line[num_read - 1] = '\0';
         }
 
         char junk;
+        //Scan each line for exactly 3 integers and return the number of matched characters
         int matched = sscanf(line, "%d %d %d %s", &pid, &arrival, &cpu_time, &junk);
+
+        //If the format is correct (exactly 3 integers are present on each line)
         if (matched == 3)
         {
+            //Validate the variables
             if (pid >= 0 && arrival >= 0 && cpu_time > 0)
             {
+                //Check if there are more entries than the currently allocated capacity (If true allocate more space)
                 if (line_num >= capacity) {
                     capacity *= 2;
                     // used size of pointer instead of struct 
@@ -274,6 +294,7 @@ int load_workload(const char* path, job_t** jobs, int* n){
                     }
                     *jobs = new_jobs_array;
                 }
+                //Populate the jobs struct with the information on each line
                 (*jobs)[line_num].pid = pid;
                 (*jobs)[line_num].arrival = arrival;
                 (*jobs)[line_num].cpu_time = cpu_time;
@@ -281,6 +302,7 @@ int load_workload(const char* path, job_t** jobs, int* n){
             }
             else
             {
+                //If simulation variables are incorrect (pid, arrival, or cpu time)
                 fprintf(stderr, "Incorrect values for workloads!\n");
                 workload_status = 1;
                 break;
@@ -288,12 +310,14 @@ int load_workload(const char* path, job_t** jobs, int* n){
         }
         else
         {
+            //If the entries of the table is incorrect (not exactly 3 integers are present)
             fprintf(stderr, "Incorrect formatting of the table!\n");
             workload_status = 1;
             break;
         }
     }
 
+    //If there are no entries in the table
     if (line_num == 0)
     {
         fprintf(stderr, "No jobs present in file!");
@@ -303,6 +327,7 @@ int load_workload(const char* path, job_t** jobs, int* n){
         return 1;
     }
 
+    //Iterate through each populated jobs and make sure that they have all unique PID's
     int j = 1;
     for (int i = 0; i < line_num; i++)
     {
@@ -318,15 +343,13 @@ int load_workload(const char* path, job_t** jobs, int* n){
         j++;
     }
 
+    //Sort by PID
     insertion_sort_pid((*jobs), line_num);
 
+    //Sort by arrival time
     insertion_sort_arrival((*jobs), line_num);
-    // think we need to remove this print line (not in the expected output txt) 
-    for (int i = 0; i < line_num; i++)
-    {
-        printf("Sorted by PID --> PID: %d\t Arrival time: %d\t CPU time: %d\n", (*jobs)[i].pid, (*jobs)[i].arrival, (*jobs)[i].cpu_time);
-    }
 
+    //Set the number of entries to the number of lines
     *n = line_num;
 
     free(line); // frees memory 
@@ -335,6 +358,7 @@ int load_workload(const char* path, job_t** jobs, int* n){
     fclose(file);
     file = NULL;
 
+    //Return the status of the workload function
     return workload_status;
 }
 
@@ -369,6 +393,7 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
         return 1;
     }
     
+    //Initialize job details parameters
     for (int i = 0; i < n; i++) {
         job_details[i].pid = jobs[i].pid;
         job_details[i].first_run = -1;
@@ -389,8 +414,10 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
         int num_jobs_finished = 0;
         (*out).context_switches = 0;
 
+        //Loop until all of the jobs have been completed
         while (num_jobs_finished < n)
         {
+            //Allocate more space when capacity is full
             if (cpu_tick >= capacity)
             {
                 capacity *= 2;
@@ -398,7 +425,7 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
 
                 if (new_cpu_runtime_array == NULL)
                 {
-                    fprintf(stderr, "Memory reallocation failed in simulate!");
+                    fprintf(stderr, "Memory reallocation failed in FCFS!");
                     free(cpu_runtime_array);
                     cpu_runtime_array = NULL;
                     return 1;
@@ -406,6 +433,7 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
                 cpu_runtime_array = new_cpu_runtime_array;
             }
 
+            //If the current process has finished
             if (curr_process_runtime == jobs[index].cpu_time)
             {
                 job_details[index].completion = cpu_tick;
@@ -417,6 +445,7 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
                 (*out).context_switches++;
             }
 
+            //Iterate through all the jobs and check if they aren't already in the queue and enqueue them if they have arrived
             for (int i = 0; i < n; i++)
             {
                 if (!is_in_queue(&queue, jobs[i].pid) && jobs[i].arrival == cpu_tick)
@@ -425,9 +454,10 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
                 }
             }
 
+            //Check if there is at least a process running
             if (!is_empty(&queue))
             {
-                // checks if prpcess has never been scheduled and reports 1st cpu time 
+                // checks if process has never been scheduled and reports 1st cpu time 
                 if (job_details[index].first_run == -1)
                 {
                     job_details[index].pid = jobs[index].pid;
@@ -441,11 +471,13 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
             }
             else
             {
+                //There are no process running currently (CPU is idling)
                 cpu_runtime_array[cpu_tick] = -1;
             }
             cpu_tick++;
         }
 
+        //Calculate avg metrics
         (*out).avg_tat = (double)sum_tat(job_details, n) / n;
         (*out).avg_resp = (double)sum_resp(job_details, n) / n;
         (*out).context_switches--;
@@ -467,7 +499,7 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
         Queue queue;
         initialize_queue(&queue);
 
-        // allocate space 
+        //Allocate space 
         int *jobs_left = malloc(n * sizeof(int));
         int *added_jobs = calloc(n, sizeof(int));
 
@@ -481,6 +513,7 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
             return 1; // safely exit 
         }
 
+        //Iterate through all the remaining jobs and set their cpu time
         for (int i = 0; i < n; i++) 
         {
             jobs_left[i] = jobs[i].cpu_time; 
@@ -491,8 +524,10 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
         int current_index = -1; 
         int quantum_used = 0; 
 
+        //Loop until all of the jobs have been completed
         while (num_jobs_finished < n)
         {
+            //Allocate more space when capacity is full
             if (cpu_tick >= capacity)
             {
                 capacity *= 2; // double capacity 
@@ -506,9 +541,9 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
                     free(cpu_runtime_array);
                     return 1;
                 }
-                cpu_runtime_array= new_cpu_runtime_array; 
+                cpu_runtime_array = new_cpu_runtime_array; 
             }
-            // add jobs that just arrived to ready queue 
+            // Add jobs that just arrived to ready queue 
             for (int i = 0; i < n; i++)
             {
                 if (!added_jobs[i] && jobs[i].arrival == cpu_tick)
@@ -535,11 +570,11 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
                 if (job_details[current_index].first_run == -1)
                 {
                     job_details[current_index].first_run = cpu_tick;
-                    job_details[current_index].resp =
-                    job_details[current_index].first_run - jobs[current_index].arrival;
+                    job_details[current_index].resp = job_details[current_index].first_run - jobs[current_index].arrival;
                 }
             }
 
+            //If there is a process currently running
             if (current_index != -1)
             {
                 cpu_runtime_array[cpu_tick] = jobs[current_index].pid;
@@ -547,7 +582,7 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
                 jobs_left[current_index]--;
                 quantum_used++;
 
-                // process done at the end of this tick
+                //Process done at the end of this tick
                 if (jobs_left[current_index] == 0)
                 {
                     job_details[current_index].completion = cpu_tick + 1;
@@ -557,7 +592,7 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
                     quantum_used = 0;
                     num_jobs_finished++;
                 }
-                // quantum expired, put the process at back of queue
+                //Quantum expired, put the process at back of queue
                 else if (quantum_used == cfg->quantum)
                 {
                     enqueue(&queue, jobs[current_index].pid);
@@ -567,31 +602,35 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
             }
             else
             {
+                //No process running at this tick (CPU idle)
                 cpu_runtime_array[cpu_tick] = -1;
             }
 
             cpu_tick++;
         }
 
-    out->context_switches = 0;
-    int prev = -1;
+        out->context_switches = 0;
+        int prev = -1;
 
-    for (int i = 0; i < cpu_tick; i++)
-    {
-        int cur = cpu_runtime_array[i];
-
-        if (cur >= 0 && prev >= 0 && cur != prev)
+        //Iterate through the cpu ticks and check if the current PID is different from the previous PID (context switch)
+        for (int i = 0; i < cpu_tick; i++)
         {
-            out->context_switches++;
-        }
+            int cur = cpu_runtime_array[i];
 
-        if (cur >= 0)
-         {
-            prev = cur;
+            if (cur >= 0 && prev >= 0 && cur != prev)
+            {
+                out->context_switches++;
+            }
+
+            if (cur >= 0)
+            {
+                prev = cur;
+            }
         }
-    }
+        //Metric averages
         out->avg_tat = (double)sum_tat(job_details, n) / n;
         out->avg_resp = (double)sum_resp(job_details, n) / n;
+        
         // call printing functions 
         print_time_array(cpu_tick);
         print_run_array(cpu_runtime_array, cpu_tick);
@@ -599,10 +638,13 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
 
         // free memory 
         free(jobs_left);
+        jobs_left = NULL;
+
         free(added_jobs);
+        added_jobs = NULL;
+
         free(cpu_runtime_array);
         cpu_runtime_array = NULL;
-        
 
         free(job_details);
         job_details = NULL;

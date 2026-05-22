@@ -30,7 +30,7 @@ sched.o: sched.c sched.h queue.h
 	$(CC) $(CFLAGS) -c $<
 
 
-#Run executable manually
+#Run executable automatically
 run_FCFS: sched
 	./sched --policy=FCFS --in=W1.txt
 
