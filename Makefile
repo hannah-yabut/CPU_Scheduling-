@@ -29,17 +29,21 @@ sched: sched.o
 sched.o: sched.c sched.h queue.h
 	$(CC) $(CFLAGS) -c $<
 
+QUANTUM ?= 2
+FILE	?= workload.txt
 
 #Run executable automatically
 run_FCFS: sched
-	./sched --policy=FCFS --in=W1.txt
+	./sched --policy=FCFS --in=$(FILE)
 
 run_RR: sched
-	./sched --policy=RR --quantum=2 --in=workload.txt
+	./sched --policy=RR --quantum=$(QUANTUM) --in=$(FILE)
+
+POLICY ?= RR
 
 #Run memory leak and error detection with Valgrind by using workload.txt file as input
 valgrind: sched
-	$(VALGRIND) $(VGFLAGS) ./sched --policy=RR --quantum=2 --in=workload.txt
+	$(VALGRIND) $(VGFLAGS) ./sched --policy=$(POLICY) --quantum=$(QUANTUM) --in=$(FILE)
 
 #Alias for Valgrind
 vg: valgrind
