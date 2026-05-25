@@ -16,6 +16,11 @@
 #include "queue.h"
 #include "stdbool.h"
 
+/*
+Description: sorts array of jobs in ascending order based on PID using insertion sort 
+Parameteres: array, n 
+Return: None 
+*/
 void insertion_sort_pid(job_t* array, int n) {
     for (int i = 1; i < n; ++i)
     {
@@ -40,6 +45,11 @@ void insertion_sort_pid(job_t* array, int n) {
     }
 }
 
+/*
+Description: sorts array of jobs in ascending order based on arrival time 
+Parameteres: array, n
+Return: None 
+*/
 void insertion_sort_arrival(job_t* array, int n) {
     for (int i = 1; i < n; ++i)
     {
@@ -64,6 +74,11 @@ void insertion_sort_arrival(job_t* array, int n) {
     }
 }
 
+/*
+Description: Prints the CPU timeline 
+Parameteres: n 
+Return: None 
+*/
 void print_time_array(int n)
 {   
     //Reserve 4 spaces with a left-alignment
@@ -75,6 +90,11 @@ void print_time_array(int n)
     printf("\n");
 }
 
+/*
+Description: Prints the run cpu ticks 
+Parameteres: array, n 
+Return: None 
+*/
 void print_run_array(int* array, int n)
 {   
     //Reserve 4 spaces with a left-alignment
@@ -95,6 +115,11 @@ void print_run_array(int* array, int n)
     printf("\n");
 }
 
+/*
+Description: Prints the detailed job details as per the specifications in the output 
+Parameteres:  job_details, n 
+Return: None 
+*/
 void print_job_details(job_details_t* job_details, int n)
 {
     for (int i = 0; i < n; i++)
@@ -107,11 +132,21 @@ void print_job_details(job_details_t* job_details, int n)
     }
 }
 
+/*
+Description: Prints the CPU system metrics 
+Parameteres: out 
+Return: None 
+*/
 void print_job_systems(sim_metrics_t out)
 {   
     printf("System: ctx_switches=%d, avgTAT=%.3f, avgRESP=%.3f \n", out.context_switches, out.avg_tat, out.avg_resp);
 }
 
+/*
+Description: Calculates total turnaround time of all jobs 
+Parameteres: job_details, n 
+Return: total 
+*/
 int sum_tat(job_details_t* job_details, int n)
 {
     int total = 0;
@@ -121,7 +156,11 @@ int sum_tat(job_details_t* job_details, int n)
     }
     return total;
 }
-
+/*
+Description: calculates total response time of all jobs 
+Parameteres: job_details, n 
+Return: total 
+*/
 int sum_resp(job_details_t* job_details, int n)
 {
     int total = 0;
@@ -132,6 +171,11 @@ int sum_resp(job_details_t* job_details, int n)
     return total;
 }
 
+/*
+Description: Prints the usage message if the user input is incorrect 
+Parameteres: prog 
+Return: None 
+*/
 static void usage(const char* prog){
     /* one-line usage only (per spec) */
     fprintf(stderr, "Usage: %s --policy=FCFS|RR [--quantum=N] --in=FILE\n", prog);
@@ -141,7 +185,12 @@ static void usage(const char* prog){
    Required: --policy=FCFS|RR, --in=FILE
    Optional: --quantum=N (required iff RR; N>0)
    On error: print usage() and return non-zero.
+   Description: parses and validates command line args to ensure requireed arguments are present and validates policy and quantums 
+   Parameteres: argc, argv, cfg, in_path 
+   Return: 0 or 1 
 */
+
+
 int parse_args(int argc, char** argv, sim_cfg_t* cfg, const char** in_path)
 {
     (void)argc; (void)argv; (void)cfg; (void)in_path;
@@ -226,6 +275,10 @@ int parse_args(int argc, char** argv, sim_cfg_t* cfg, const char** in_path)
 
 /* TODO: read "PID ARRIVAL CPU_TIME", ignore lines starting with '#', validate:
    pid>=0, arrival>=0, cpu>0. Sort by (arrival, pid). Return 0 on success.
+   Description: reads from input file while ignoring comments and empty lines. Validates process values, 
+   dynamically allocates memory for jobs, and sorts jobs by arrival time and PID 
+   Parameteres: path, jobs, n 
+   Return: 0 or 1 
 */
 int load_workload(const char* path, job_t** jobs, int* n){
     (void)path; (void)jobs; (void)n;
@@ -373,6 +426,9 @@ int load_workload(const char* path, job_t** jobs, int* n){
      run : <pid or -> per tick
      Pk: first run=... completion=... TAT=... RESP=...
      System: ctx_switches=..., avgTAT=..., avgRESP=...
+     Description: simulates CPU scheduling using FCFS or RR. 
+     Parameteres: jobs, n, cfg, out 
+     Return: 0 or 1 
 */
 int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out){
     (void)jobs; (void)n; (void)cfg; (void)out;
@@ -653,6 +709,11 @@ int simulate(const job_t* jobs, int n, const sim_cfg_t* cfg, sim_metrics_t* out)
     }
 }
 
+/*
+Description: Calls helper functions to simulate CPU scheduling 
+Parameteres: argc, argv 
+Return: 0 
+*/
 int main(int argc, char** argv){
     sim_cfg_t cfg; const char* in_path=NULL;
     int pr = parse_args(argc, argv, &cfg, &in_path);
